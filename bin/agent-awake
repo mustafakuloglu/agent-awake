@@ -46,7 +46,7 @@ warn() {
 
 show_status() {
   printf 'Power source:\n'
-  /usr/bin/pmset -g batt | /usr/bin/sed -n '1p'
+  power_source
   printf '\nRelevant power settings:\n'
   print_relevant_power_settings
   printf '\nPower assertions:\n'
@@ -59,8 +59,12 @@ require_macos() {
   [ -x /usr/bin/pmset ] || die "missing /usr/bin/pmset"
 }
 
+power_source() {
+  /usr/bin/pmset -g batt | /usr/bin/sed -n '1p'
+}
+
 on_ac_power() {
-  /usr/bin/pmset -g batt | /usr/bin/sed -n '1p' | /usr/bin/grep -q 'AC Power'
+  power_source | /usr/bin/grep -Eq 'AC Power|No battery power source'
 }
 
 print_relevant_power_settings() {
@@ -82,7 +86,7 @@ show_preflight() {
   /usr/bin/uname -srm
 
   printf 'Power: '
-  /usr/bin/pmset -g batt | /usr/bin/sed -n '1p'
+  power_source
   if on_ac_power; then
     printf 'Power check: ok for --lid\n'
   else
@@ -141,15 +145,21 @@ disable_lid_sleep() {
 
 restore_lid_sleep() {
   if [ "$LID_OVERRIDE_ENABLED" = 1 ]; then
-    /usr/bin/sudo -n /usr/bin/pmset -a disablesleep 0 2>/dev/null || /usr/bin/sudo /usr/bin/pmset -a disablesleep 0
-    LID_OVERRIDE_ENABLED=0
+    if /usr/bin/sudo -n /usr/bin/pmset -a disablesleep 0 2>/dev/null || /usr/bin/sudo /usr/bin/pmset -a disablesleep 0; then
+      LID_OVERRIDE_ENABLED=0
+      return 0
+    fi
+    return 1
   fi
+  return 0
 }
 
 cleanup() {
   exit_code=$?
   trap - EXIT INT TERM HUP
-  restore_lid_sleep
+  if ! restore_lid_sleep; then
+    warn "could not restore lid sleep; run: agent-awake --restore-lid"
+  fi
   stop_sudo_keepalive
   exit "$exit_code"
 }
