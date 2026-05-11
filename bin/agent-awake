@@ -1,0 +1,183 @@
+#!/bin/sh
+set -eu
+
+PROG="$(basename "$0")"
+LID_MODE=0
+HOLD_MODE=0
+SUDO_KEEPALIVE_PID=""
+LID_OVERRIDE_ENABLED=0
+
+usage() {
+  cat <<'EOF'
+Usage:
+  agent-awake [--lid] [--] command [args...]
+  agent-awake [--lid] --hold
+  agent-awake --status
+  agent-awake --restore-lid
+
+Examples:
+  agent-awake -- ./long-running-job.sh
+  agent-awake -- ./backup.sh
+  agent-awake --lid -- ./backup.sh
+  agent-awake --lid --hold
+
+Behavior:
+  Default mode uses caffeinate to prevent idle sleep while a command runs.
+  --lid also enables macOS "disablesleep" until the command exits, then
+  restores it.
+
+Notes:
+  --lid requires sudo because it changes a system power setting.
+  Use --lid only on AC power and a hard surface. Do not put a closed running
+  laptop in a bag.
+EOF
+}
+
+die() {
+  printf '%s: %s\n' "$PROG" "$*" >&2
+  exit 1
+}
+
+warn() {
+  printf '%s: %s\n' "$PROG" "$*" >&2
+}
+
+show_status() {
+  /usr/bin/pmset -g batt | /usr/bin/sed -n '1p'
+  printf '\n'
+  /usr/bin/pmset -g custom
+  printf '\n'
+  /usr/bin/pmset -g assertions | /usr/bin/grep -E 'PreventSystemSleep|PreventUserIdleSystemSleep|NoIdleSleepAssertion|caffeinate|agent-awake' || true
+}
+
+require_macos() {
+  [ "$(uname -s)" = "Darwin" ] || die "this script is macOS-only"
+  [ -x /usr/bin/caffeinate ] || die "missing /usr/bin/caffeinate"
+  [ -x /usr/bin/pmset ] || die "missing /usr/bin/pmset"
+}
+
+on_ac_power() {
+  /usr/bin/pmset -g batt | /usr/bin/sed -n '1p' | /usr/bin/grep -q 'AC Power'
+}
+
+require_sudo() {
+  if [ -t 0 ] && [ -t 2 ]; then
+    /usr/bin/sudo -v
+  else
+    /usr/bin/sudo -n -v 2>/dev/null || die "--lid requires sudo auth; run sudo -v once from an interactive terminal first"
+  fi
+}
+
+start_sudo_keepalive() {
+  (
+    while :; do
+      /usr/bin/sudo -n -v 2>/dev/null || exit 0
+      /bin/sleep 60
+    done
+  ) &
+  SUDO_KEEPALIVE_PID="$!"
+}
+
+stop_sudo_keepalive() {
+  if [ -n "$SUDO_KEEPALIVE_PID" ]; then
+    /bin/kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
+    SUDO_KEEPALIVE_PID=""
+  fi
+}
+
+disable_lid_sleep() {
+  if ! on_ac_power; then
+    warn "--lid requested while not on AC power; macOS may still sleep and this is not thermally sensible"
+  fi
+
+  require_sudo
+  start_sudo_keepalive
+  /usr/bin/sudo /usr/bin/pmset -a disablesleep 1
+  LID_OVERRIDE_ENABLED=1
+}
+
+restore_lid_sleep() {
+  if [ "$LID_OVERRIDE_ENABLED" = 1 ]; then
+    /usr/bin/sudo -n /usr/bin/pmset -a disablesleep 0 2>/dev/null || /usr/bin/sudo /usr/bin/pmset -a disablesleep 0
+    LID_OVERRIDE_ENABLED=0
+  fi
+}
+
+cleanup() {
+  exit_code=$?
+  trap - EXIT INT TERM HUP
+  restore_lid_sleep
+  stop_sudo_keepalive
+  exit "$exit_code"
+}
+
+caffeinate_flags() {
+  if on_ac_power; then
+    printf '%s\n' '-dims'
+  else
+    printf '%s\n' '-dim'
+  fi
+}
+
+run_awake() {
+  flags="$(caffeinate_flags)"
+  if [ "$#" -gt 0 ]; then
+    /usr/bin/caffeinate "$flags" "$@"
+  else
+    /usr/bin/caffeinate "$flags"
+  fi
+}
+
+require_macos
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --lid)
+      LID_MODE=1
+      shift
+      ;;
+    --hold)
+      HOLD_MODE=1
+      shift
+      ;;
+    --status)
+      show_status
+      exit 0
+      ;;
+    --restore-lid)
+      require_sudo
+      /usr/bin/sudo /usr/bin/pmset -a disablesleep 0
+      exit 0
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      die "unknown option: $1"
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+if [ "$HOLD_MODE" = 1 ] && [ "$#" -gt 0 ]; then
+  die "--hold cannot be combined with a command"
+fi
+
+if [ "$LID_MODE" = 1 ]; then
+  trap cleanup EXIT INT TERM HUP
+  disable_lid_sleep
+fi
+
+if [ "$HOLD_MODE" = 1 ]; then
+  run_awake
+else
+  [ "$#" -gt 0 ] || die "missing command; use --hold to keep awake without a command"
+  run_awake "$@"
+fi
