@@ -12,6 +12,7 @@ usage() {
 Usage:
   agent-awake [--lid] [--] command [args...]
   agent-awake [--lid] --hold
+  agent-awake --preflight
   agent-awake --status
   agent-awake --restore-lid
 
@@ -25,6 +26,7 @@ Behavior:
   Default mode uses caffeinate to prevent idle sleep while a command runs.
   --lid also enables macOS "disablesleep" until the command exits, then
   restores it.
+  --preflight reports whether this machine looks ready for lid mode.
 
 Notes:
   --lid requires sudo because it changes a system power setting.
@@ -43,10 +45,11 @@ warn() {
 }
 
 show_status() {
+  printf 'Power source:\n'
   /usr/bin/pmset -g batt | /usr/bin/sed -n '1p'
-  printf '\n'
-  /usr/bin/pmset -g custom
-  printf '\n'
+  printf '\nRelevant power settings:\n'
+  print_relevant_power_settings
+  printf '\nPower assertions:\n'
   /usr/bin/pmset -g assertions | /usr/bin/grep -E 'PreventSystemSleep|PreventUserIdleSystemSleep|NoIdleSleepAssertion|caffeinate|agent-awake' || true
 }
 
@@ -58,6 +61,46 @@ require_macos() {
 
 on_ac_power() {
   /usr/bin/pmset -g batt | /usr/bin/sed -n '1p' | /usr/bin/grep -q 'AC Power'
+}
+
+print_relevant_power_settings() {
+  /usr/bin/pmset -g custom | /usr/bin/awk '
+    /^(AC Power:|Battery Power:)/ { print; next }
+    $1 == "sleep" ||
+    $1 == "displaysleep" ||
+    $1 == "ttyskeepawake" ||
+    $1 == "tcpkeepalive" ||
+    $1 == "networkoversleep" ||
+    $1 == "lowpowermode" { print }
+  '
+}
+
+show_preflight() {
+  printf 'agent-awake preflight\n\n'
+
+  printf 'Platform: '
+  /usr/bin/uname -srm
+
+  printf 'Power: '
+  /usr/bin/pmset -g batt | /usr/bin/sed -n '1p'
+  if on_ac_power; then
+    printf 'Power check: ok for --lid\n'
+  else
+    printf 'Power check: not on AC power; --lid is not recommended\n'
+  fi
+
+  if /usr/bin/sudo -n -v 2>/dev/null; then
+    printf 'Sudo check: ready for non-interactive --lid\n'
+  else
+    printf 'Sudo check: not ready; run sudo -v in an interactive terminal before --lid\n'
+  fi
+
+  printf '\nRelevant power settings:\n'
+  print_relevant_power_settings
+
+  printf '\nNetwork note: tcpkeepalive/networkoversleep are useful signals, not proof that Wi-Fi or an agent API connection survives lid close.\n'
+  printf 'Thermal note: use --lid only on AC power, on a hard surface, with airflow.\n'
+  printf 'Best test: run a short --lid command, close the lid, reopen, and confirm the command finished and lid sleep was restored.\n'
 }
 
 require_sudo() {
@@ -142,6 +185,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --status)
       show_status
+      exit 0
+      ;;
+    --preflight)
+      show_preflight
       exit 0
       ;;
     --restore-lid)

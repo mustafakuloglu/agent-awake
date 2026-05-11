@@ -18,6 +18,11 @@ If it is not on PATH, locate the `agent-awake` repo and use
 `bin/agent-awake -- <command>` from that checkout. If no local checkout exists,
 clone `https://github.com/mustafakuloglu/agent-awake.git` and use
 `bin/agent-awake -- <command>` from the clone.
+
+Before relying on lid mode on an unknown machine, run `agent-awake --preflight`
+or `bin/agent-awake --preflight`. If sudo is not ready, ask me to run `sudo -v`
+in an interactive terminal first. If network continuity matters, warn me that
+only a lid-closed smoke test proves the agent API connection survives.
 ```
 
 Short version:

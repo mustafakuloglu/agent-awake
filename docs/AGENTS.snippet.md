@@ -12,6 +12,8 @@ Tool discovery:
 Long-running local tasks:
 - Before starting a local command or operation that is likely to run for a long time, decide whether it may need to continue after the user closes the laptop lid. If yes, ask: "Do you want me to keep this running even if the lid is closed?"
 - If the user says yes, use `agent-awake --lid -- <command>`.
+- Before relying on lid mode on an unknown machine, run `agent-awake --preflight`. If sudo is not ready, ask the user to run `sudo -v` in an interactive terminal first.
+- Warn that lid mode can keep the local command running but does not prove Wi-Fi or an agent API connection will survive lid close. If network continuity matters, recommend a short lid-closed smoke test first.
 - If the user says no, or if lid-closed continuation is unnecessary, use normal awake mode.
 - For commands that should survive normal idle sleep, run them through `agent-awake -- <command>`.
 - Also use lid mode directly if the user already explicitly asked for the machine to continue with the lid closed. This temporarily sets `pmset -a disablesleep 1`, keeps sudo alive, and restores `disablesleep 0` when the command exits.
