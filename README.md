@@ -7,7 +7,7 @@ sleep.
 
 ## Give This To An Agent
 
-Read and follow the agent-awake instructions at https://github.com/mustafakuloglu/agent-awake#readme for long-running local work.
+Read and follow the agent-awake instructions at https://github.com/mustafakuloglu/agent-awake#readme for long-running local work; if agent-awake is not available locally, clone https://github.com/mustafakuloglu/agent-awake.git and use its `bin/agent-awake`.
 
 ## Install
 
@@ -72,6 +72,7 @@ Tool discovery:
 - Prefer `agent-awake` from `PATH` when available.
 - If it is not on `PATH`, locate the `agent-awake` repository and use its `bin/agent-awake` script directly.
 - If the repository is checked out beside the current project, a typical relative path is `../agent-awake/bin/agent-awake`.
+- If `agent-awake` is not installed and no local checkout exists, clone `https://github.com/mustafakuloglu/agent-awake.git` and use `bin/agent-awake` from that checkout.
 - If the user gives you the `agent-awake` repository as context, treat its `AGENTS.md` as the policy for long-running local tasks in the current task, even when the command runs in a different project.
 
 Long-running local tasks:

@@ -15,12 +15,13 @@ whether it should continue if the laptop lid is closed. If yes, ask me:
 
 Use `agent-awake -- <command>` when `agent-awake` is installed on PATH.
 If it is not on PATH, locate the `agent-awake` repo and use
-`bin/agent-awake -- <command>` from that checkout.
+`bin/agent-awake -- <command>` from that checkout. If no local checkout exists,
+clone `https://github.com/mustafakuloglu/agent-awake.git` and use
+`bin/agent-awake -- <command>` from the clone.
 ```
 
 Short version:
 
 ```md
-Use the `agent-awake` repo. Read `agent-awake/AGENTS.md` and follow it for all
-long-running local work in this task.
+Read and follow the agent-awake instructions at https://github.com/mustafakuloglu/agent-awake#readme for long-running local work; if agent-awake is not available locally, clone https://github.com/mustafakuloglu/agent-awake.git and use its `bin/agent-awake`.
 ```

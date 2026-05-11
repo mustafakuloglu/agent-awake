@@ -6,6 +6,7 @@ Tool discovery:
 - Prefer `agent-awake` from `PATH` when available.
 - If it is not on `PATH`, locate this repository and use its `bin/agent-awake` script directly.
 - If this repository is checked out beside another project, a typical relative path is `../agent-awake/bin/agent-awake`.
+- If `agent-awake` is not installed and no local checkout exists, clone `https://github.com/mustafakuloglu/agent-awake.git` and use `bin/agent-awake` from that checkout.
 - If the user gives you this repository as context, treat this `AGENTS.md` as the policy for long-running local tasks in the current task, even when the command runs in a different project.
 
 Long-running local tasks:
